@@ -13,13 +13,14 @@ except ImportError:
     exit(1)
 
 import pandas as pd
+import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EVAL_ROOT = PROJECT_ROOT / "eval"
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.agents.dqn_agent import DQNAgent
+from scripts.train import create_agent
 from src.utils.data_loader import load_and_preprocess_data
 from src.utils.environment_setup import create_eval_env
 from src.utils.visualization import (
@@ -28,8 +29,12 @@ from src.utils.visualization import (
     plot_portfolio_performance,
     plot_trading_actions_timeline,
     plot_baseline_comparison,
-    collect_episode_data
+    collect_episode_data,
+    plot_comparative_trading_decisions,
+    plot_comparative_portfolio_performance,
+    plot_comparative_trading_timeline
 )
+import matplotlib.pyplot as plt
 
 
 def resolve_project_path(path_like, base=None):
@@ -70,51 +75,114 @@ def load_config(config_path='configs/hyperparameters_v1.yaml'):
         return yaml.safe_load(f)
 
 
+
+
 def generate_training_curves(config, save_dir='eval', run_dir=None):
-    """Plot training learning curves."""
+    """Plot training learning curves for all agents."""
     print("Training curves...")
-    log_cfg = config.get('logging', {})
-    log_dir = resolve_project_path(log_cfg.get('log_dir', 'logs'))
-    csv_file = Path(log_cfg.get('csv_log_file', 'training_log.csv'))
     
     # If run_dir is provided, use it; otherwise use save_dir
     if run_dir:
         save_dir = Path(run_dir) / "eval" / "png"
+        run_dir_path = Path(run_dir)
     else:
         save_dir = Path(save_dir)
         if not save_dir.is_absolute():
             save_dir = resolve_project_path(save_dir)
+        run_dir_path = None
     
-    # Try to find training log in run directory if run_dir is provided
-    if run_dir:
-        run_training_log = Path(run_dir) / "training_log.csv"
-        if run_training_log.exists():
-            csv_file = run_training_log
+    save_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Find all training logs
+    agent_types = ['dqn', 'ppo']
+    training_logs = {}
+    
+    for agent_type in agent_types:
+        if run_dir_path:
+            csv_path = run_dir_path / f"training_log_{agent_type}.csv"
+        else:
+            log_cfg = config.get('logging', {})
+            log_dir = resolve_project_path(log_cfg.get('log_dir', 'logs'))
+            csv_path = log_dir / f"training_log_{agent_type}.csv"
+        
+        if csv_path.exists():
+            training_logs[agent_type.upper()] = csv_path
+    
+    if not training_logs:
+        print("  ⚠ No training logs found")
+        return
+    
+    # Plot training curves for each agent
+    for agent_name, csv_path in training_logs.items():
+        try:
+            save_path = save_dir / f'training_curves_{agent_name.lower()}.png'
+            plot_training_curves(csv_path=csv_path, save_path=str(save_path))
+            print(f"  ✓ {agent_name} training curves: {save_path}")
+        except Exception as e:
+            print(f"  ✗ Error plotting {agent_name} curves: {e}")
+    
+    # Create combined comparison plot if multiple agents
+    if len(training_logs) > 1:
+        try:
+            save_path = save_dir / 'training_curves_comparison.png'
+            plot_training_curves_comparison(training_logs, save_path=str(save_path))
+            print(f"  ✓ Training curves comparison: {save_path}")
+        except Exception as e:
+            print(f"  ✗ Error creating comparison: {e}")
 
-    candidate_paths = []
-    if csv_file.is_absolute():
-        candidate_paths.append(csv_file)
+
+def plot_training_curves_comparison(training_logs, save_path=None):
+    """
+    Plot comparison of training curves for multiple agents.
+    
+    Args:
+        training_logs: Dictionary mapping agent names to CSV paths
+        save_path: Path to save the plot
+    """
+    fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+    
+    for agent_name, csv_path in training_logs.items():
+        df = pd.read_csv(csv_path)
+        if 'episode' not in df:
+            df['episode'] = np.arange(1, len(df) + 1)
+        
+        # Reward
+        axes[0,0].plot(df['episode'], df.get('reward', pd.Series([0]*len(df))), 
+                      label=agent_name, alpha=0.7)
+        
+        # Loss
+        if 'loss' in df:
+            axes[0,1].plot(df['episode'], df['loss'], label=agent_name, alpha=0.7)
+        
+        # Portfolio return
+        if 'portfolio_return' in df:
+            axes[1,0].plot(df['episode'], df['portfolio_return'] * 100, 
+                          label=agent_name, alpha=0.7)
+        
+        # Excess return
+        if 'excess_return' in df:
+            axes[1,1].plot(df['episode'], df['excess_return'] * 100, 
+                          label=agent_name, alpha=0.7)
+    
+    axes[0,0].set(title='Episode Reward Comparison', xlabel='Episode', ylabel='Reward')
+    axes[0,1].set(title='Training Loss Comparison', xlabel='Episode', ylabel='Loss')
+    axes[1,0].set(title='Portfolio Return Comparison', xlabel='Episode', ylabel='Return (%)')
+    axes[1,1].set(title='Excess Return Comparison', xlabel='Episode', ylabel='Excess Return (%)')
+    
+    for ax in axes.flat:
+        ax.legend(loc='best')
+        ax.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
     else:
-        if csv_file.parent == Path('.'):
-            candidate_paths.append(log_dir / csv_file)
-        candidate_paths.append(resolve_project_path(csv_file))
-    if not candidate_paths:
-        candidate_paths.append(log_dir / csv_file)
-
-    csv_path = next((p for p in candidate_paths if p.exists()), candidate_paths[0])
-    try:
-        if not csv_path.exists():
-            raise FileNotFoundError(f"No training log found ({csv_path})")
-        save_path = Path(save_dir) / 'training_curves.png'
-        save_path.parent.mkdir(parents=True, exist_ok=True)
-        plot_training_curves(csv_path=csv_path, save_path=str(save_path))
-        print(f"  ✓ {save_path}")
-    except Exception as e:
-        print(f"  ✗ {e}")
+        plt.show()
+    plt.close()
 
 
 def generate_evaluation_plots(config, save_dir='eval', run_dir=None):
-    """Plot evaluation results and compare with baselines."""
+    """Plot evaluation results and compare all agents."""
     print("Evaluation plots...")
     
     # If run_dir is provided, use it; otherwise use save_dir
@@ -129,38 +197,46 @@ def generate_evaluation_plots(config, save_dir='eval', run_dir=None):
     
     save_dir.mkdir(parents=True, exist_ok=True)
     
-    # Baselines: CSVs must exist for comparison
+    # Load all available agent results
+    agent_types = ['dqn', 'ppo', 'random']
+    results = {}
+    
+    for agent_type in agent_types:
+        csv_path = csv_dir / f'{agent_type}_results.csv'
+        if csv_path.exists():
+            results[agent_type.upper()] = pd.read_csv(csv_path)
+            print(f"  ✓ Loaded {agent_type.upper()} results")
+    
+    # Also check for agents_comparison.png (created by evaluate_all_agents)
     if run_dir:
-        baseline_csvs = {
-            'Random': csv_dir / 'random_results.csv',
-            'DQN': csv_dir / 'dqn_results.csv'
-        }
-    else:
-        baseline_csvs = {
-            'Random': EVAL_ROOT / 'csv' / 'random_results.csv',
-            'DQN': eval_csv
-        }
-    results = {k: pd.read_csv(p) for k, p in baseline_csvs.items() if p.exists()}
+        comparison_png = save_dir / 'agents_comparison.png'
+        if comparison_png.exists():
+            print(f"  ✓ Comparison plot already exists: {comparison_png}")
+            return
+    
     if len(results) > 1:
-        save_path = save_dir / 'baseline_comparison.png'
+        save_path = save_dir / 'agents_comparison.png'
         plot_baseline_comparison(results, save_path=str(save_path))
-        print(f"  ✓ Baseline comparison {save_path}")
+        print(f"  ✓ Agents comparison saved to {save_path}")
+    elif len(results) == 1:
+        print(f"  ⚠ Only one agent result found, skipping comparison")
     else:
-        print("  ⚠ Missing baselines for comparison")
+        print("  ⚠ No evaluation results found for comparison")
 
 
-def generate_trading_visualizations(config, model_path, save_dir='eval', num_episodes=1, max_steps=None, device=None, run_dir=None):
-    """Detailed visualization of trading episodes for trained agent."""
+def generate_trading_visualizations(config, run_dir=None, num_episodes=1, max_steps=None, device=None):
+    """Detailed visualization of trading episodes for all trained agents (aggregated comparison)."""
     print("Trading visualizations...")
     device = torch.device(device) if device else torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    # If run_dir is provided, use it; otherwise use save_dir
-    if run_dir:
-        save_dir = Path(run_dir) / "eval" / "png"
-    else:
-        save_dir = Path(save_dir)
-        if not save_dir.is_absolute():
-            save_dir = resolve_project_path(save_dir)
+    if not run_dir:
+        print("  ⚠ Run directory required for multi-agent visualizations")
+        return
+    
+    run_dir = Path(run_dir)
+    save_dir = run_dir / "eval" / "png"
+    save_dir.mkdir(parents=True, exist_ok=True)
+    
     data_cfg = config['data']
     data_folder = resolve_project_path(data_cfg['data_folder'])
     _, _, df_eval = load_and_preprocess_data(
@@ -168,6 +244,10 @@ def generate_trading_visualizations(config, model_path, save_dir='eval', num_epi
         download_if_missing=data_cfg.get('download_if_missing', True)
     )
     env_cfg = config['environment']
+    agent_cfg = config['agent']
+    network_conf = config.get('network', {})
+    
+    # Create environment (will be reused for each agent)
     env = create_eval_env(
         df_eval=df_eval,
         positions=env_cfg['positions'],
@@ -176,52 +256,123 @@ def generate_trading_visualizations(config, model_path, save_dir='eval', num_epi
     )
     obs, _ = env.reset()
     state_dim = len(obs)
-    agent_cfg = config['agent']
-    network_conf = config.get('network', {})
-    model_path = resolve_project_path(model_path)
-    if not model_path.exists():
-        print(f"  ✗ DQN model checkpoint not found at {model_path}")
+    
+    # Collect all agents and their models
+    agents = {}
+    
+    # Import required modules
+    from src.agents.random_agent import RandomAgent
+    
+    # Load DQN agent
+    dqn_checkpoint_dir = run_dir / "checkpoints" / "dqn"
+    dqn_best_model_path = dqn_checkpoint_dir / "best_model.pt"
+    if dqn_best_model_path.exists():
+        try:
+            agent = create_agent(
+                agent_type='dqn',
+                state_dim=state_dim,
+                env_conf=env_cfg,
+                agent_conf=agent_cfg,
+                network_conf=network_conf,
+                device=device
+            )
+            agent.load(str(dqn_best_model_path))
+            agent.network.eval()
+            agents['DQN'] = agent
+            print(f"  ✓ Loaded DQN agent")
+        except Exception as e:
+            print(f"  ✗ Error loading DQN agent: {e}")
+    
+    # Load PPO agent
+    ppo_checkpoint_dir = run_dir / "checkpoints" / "ppo"
+    ppo_best_model_path = ppo_checkpoint_dir / "best_model.pt"
+    if ppo_best_model_path.exists():
+        try:
+            agent = create_agent(
+                agent_type='ppo',
+                state_dim=state_dim,
+                env_conf=env_cfg,
+                agent_conf=agent_cfg,
+                network_conf=network_conf,
+                device=device
+            )
+            agent.load(str(ppo_best_model_path))
+            agent.network.eval()
+            agents['PPO'] = agent
+            print(f"  ✓ Loaded PPO agent")
+        except Exception as e:
+            print(f"  ✗ Error loading PPO agent: {e}")
+    
+    # Create Random agent
+    try:
+        random_agent = RandomAgent(positions=env_cfg['positions'])
+        agents['Random'] = random_agent
+        print(f"  ✓ Loaded Random agent")
+    except Exception as e:
+        print(f"  ✗ Error creating Random agent: {e}")
+    
+    if not agents:
+        print("  ⚠ No agents available for visualization")
         return
-    agent = DQNAgent(
-        state_dim=state_dim,
-        positions=env_cfg['positions'],
-        config_path=None,
-        lr=agent_cfg['lr'],
-        gamma=agent_cfg['gamma'],
-        epsilon_start=agent_cfg['epsilon_start'],
-        epsilon_end=agent_cfg['epsilon_end'],
-        epsilon_decay=agent_cfg['epsilon_decay'],
-        buffer_size=agent_cfg['buffer_size'],
-        batch_size=agent_cfg['batch_size'],
-        target_update_freq=agent_cfg['target_update_freq'],
-        hidden_dim=network_conf.get('hidden_dim', 128),
-        device=device
-    )
-    agent.load(str(model_path))
-    agent.q_network.eval()
-    save_dir.mkdir(parents=True, exist_ok=True)
+    
+    print(f"\n  Visualizing {len(agents)} agents: {', '.join(agents.keys())}")
+    
+    # Generate comparative visualizations for each episode
     for ep in range(num_episodes):
-        print(f"  Episode {ep + 1}/{num_episodes}...")
-        episode_data = collect_episode_data(env, agent, max_steps=max_steps)
-        # 3 visualizations per episode (decisions, performance, action timeline):
+        print(f"\n  Episode {ep + 1}/{num_episodes}...")
+        
+        # Collect episode data for all agents
+        agents_episode_data = {}
+        for agent_name, agent in agents.items():
+            try:
+                # Reset environment for each agent
+                obs, _ = env.reset()
+                episode_data = collect_episode_data(env, agent, max_steps=max_steps)
+                agents_episode_data[agent_name] = episode_data
+                print(f"    ✓ Collected data for {agent_name}")
+            except Exception as e:
+                print(f"    ✗ Error collecting data for {agent_name}: {e}")
+        
+        if not agents_episode_data:
+            print(f"    ⚠ No episode data collected for episode {ep + 1}")
+            continue
+        
+        # Create comparative visualizations
         try:
-            save_path = save_dir / f'trading_decisions_ep{ep+1}.png'
-            plot_trading_decisions(env, agent, save_path=str(save_path), episode_data=episode_data)
-            print(f"    ✓ {save_path}")
+            save_path = save_dir / f'aggregated_trading_decisions_ep{ep+1}.png'
+            plot_comparative_trading_decisions(agents_episode_data, save_path=str(save_path))
+            print(f"      ✓ Comparative trading decisions: {save_path}")
         except Exception as e:
-            print(f"    ✗ trading_decisions : {e}")
+            print(f"      ✗ Comparative trading decisions: {e}")
+        
         try:
-            save_path = save_dir / f'portfolio_performance_ep{ep+1}.png'
-            plot_portfolio_performance(episode_data, save_path=str(save_path))
-            print(f"    ✓ {save_path}")
+            save_path = save_dir / f'aggregated_portfolio_performance_ep{ep+1}.png'
+            plot_comparative_portfolio_performance(agents_episode_data, save_path=str(save_path))
+            print(f"      ✓ Comparative portfolio performance: {save_path}")
         except Exception as e:
-            print(f"    ✗ portfolio_performance : {e}")
+            print(f"      ✗ Comparative portfolio performance: {e}")
+        
         try:
-            save_path = save_dir / f'trading_timeline_ep{ep+1}.png'
-            plot_trading_actions_timeline(episode_data, env, save_path=str(save_path))
-            print(f"    ✓ {save_path}")
+            save_path = save_dir / f'aggregated_trading_timeline_ep{ep+1}.png'
+            plot_comparative_trading_timeline(agents_episode_data, save_path=str(save_path))
+            print(f"      ✓ Comparative trading timeline: {save_path}")
         except Exception as e:
-            print(f"    ✗ trading_timeline : {e}")
+            print(f"      ✗ Comparative trading timeline: {e}")
+        
+        # Also create individual plots for each agent (optional, for detailed analysis)
+        for agent_name, episode_data in agents_episode_data.items():
+            agent_type = agent_name.lower()
+            try:
+                save_path = save_dir / f'{agent_type}_trading_decisions_ep{ep+1}.png'
+                plot_trading_decisions(env, agents[agent_name], save_path=str(save_path), episode_data=episode_data)
+            except Exception as e:
+                pass  # Skip individual plots if they fail
+            
+            try:
+                save_path = save_dir / f'{agent_type}_portfolio_performance_ep{ep+1}.png'
+                plot_portfolio_performance(episode_data, save_path=str(save_path))
+            except Exception as e:
+                pass  # Skip individual plots if they fail
 
 
 def main():
@@ -268,8 +419,8 @@ def main():
     elif args.evaluation_only:
         generate_evaluation_plots(config, save_dir=str(output_dir), run_dir=run_dir)
     elif args.trading_only:
-        generate_trading_visualizations(config, args.model, save_dir=str(output_dir),
-            num_episodes=args.num_episodes, max_steps=args.max_steps, device=device, run_dir=run_dir)
+        generate_trading_visualizations(config, run_dir=str(run_dir) if run_dir else None,
+            num_episodes=args.num_episodes, max_steps=args.max_steps, device=device)
     else:
         print("=" * 60)
         print("Generating all visualizations")
@@ -279,8 +430,8 @@ def main():
         print("\n2. Evaluation plots")
         generate_evaluation_plots(config, save_dir=str(output_dir), run_dir=run_dir)
         print("\n3. Detailed trading")
-        generate_trading_visualizations(config, args.model, save_dir=str(output_dir),
-            num_episodes=args.num_episodes, max_steps=args.max_steps, device=device, run_dir=run_dir)
+        generate_trading_visualizations(config, run_dir=str(run_dir) if run_dir else None,
+            num_episodes=args.num_episodes, max_steps=args.max_steps, device=device)
         print("\n" + "=" * 60)
         if run_dir:
             print(f"All outputs saved in: {run_dir}/eval/png")

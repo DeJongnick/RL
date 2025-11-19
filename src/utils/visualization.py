@@ -323,3 +323,182 @@ def collect_episode_data(env, agent, max_steps=None):
         'num_steps': len(steps)
     }
 
+
+def plot_comparative_trading_decisions(agents_episode_data, save_path=None):
+    """
+    Plot comparative trading decisions for multiple agents on the same episode.
+    
+    Args:
+        agents_episode_data: Dictionary mapping agent names to episode data dictionaries
+        save_path: Path to save the plot (None to display)
+    """
+    if not agents_episode_data:
+        raise ValueError("No episode data provided for comparison.")
+    
+    # Get common step indices (use the shortest episode length)
+    min_steps = min(len(ep_data.get('steps', [])) for ep_data in agents_episode_data.values())
+    
+    fig, axes = plt.subplots(2, 1, figsize=(15, 10), sharex=True)
+    
+    colors = {'DQN': 'blue', 'PPO': 'green', 'Random': 'red'}
+    linestyles = {'DQN': '-', 'PPO': '--', 'Random': ':'}
+    
+    # Plot positions
+    for agent_name, episode_data in agents_episode_data.items():
+        steps = episode_data.get('steps', [])[:min_steps]
+        if not steps:
+            continue
+        
+        indices = [s['step'] for s in steps]
+        positions = [s.get('position', s.get('action', 0)) for s in steps]
+        color = colors.get(agent_name, 'gray')
+        linestyle = linestyles.get(agent_name, '-')
+        
+        axes[0].plot(indices, positions, 'o-', markersize=3, 
+                    label=agent_name, color=color, linestyle=linestyle, alpha=0.7)
+    
+    axes[0].set(ylabel='Position', title='Comparative Trading Decisions Over Time')
+    axes[0].legend(loc='best')
+    axes[0].grid(True, alpha=0.3)
+    
+    # Plot portfolio values or cumulative rewards
+    for agent_name, episode_data in agents_episode_data.items():
+        steps = episode_data.get('steps', [])[:min_steps]
+        if not steps:
+            continue
+        
+        indices = [s['step'] for s in steps]
+        portfolio_values = [s.get('portfolio_value') for s in steps]
+        cumulative_rewards = [s.get('cumulative_reward') for s in steps]
+        color = colors.get(agent_name, 'gray')
+        linestyle = linestyles.get(agent_name, '-')
+        
+        if any(v is not None for v in portfolio_values):
+            axes[1].plot(indices, [v if v is not None else np.nan for v in portfolio_values],
+                        label=f'{agent_name} Portfolio', color=color, linestyle=linestyle, alpha=0.7)
+        else:
+            axes[1].plot(indices, cumulative_rewards, 
+                        label=f'{agent_name} Cumulative Reward', color=color, linestyle=linestyle, alpha=0.7)
+    
+    axes[1].set(xlabel='Step', ylabel='Value / Reward', title='Comparative Portfolio Performance')
+    axes[1].legend(loc='best')
+    axes[1].grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    else:
+        plt.show()
+    plt.close()
+
+
+def plot_comparative_portfolio_performance(agents_episode_data, save_path=None):
+    """
+    Plot comparative portfolio performance for multiple agents.
+    
+    Args:
+        agents_episode_data: Dictionary mapping agent names to episode data dictionaries
+        save_path: Path to save the plot (None to display)
+    """
+    if not agents_episode_data:
+        raise ValueError("No episode data provided for comparison.")
+    
+    # Get common step indices
+    min_steps = min(len(ep_data.get('steps', [])) for ep_data in agents_episode_data.values())
+    
+    fig, axes = plt.subplots(2, 1, figsize=(15, 10), sharex=True)
+    
+    colors = {'DQN': 'blue', 'PPO': 'green', 'Random': 'red'}
+    linestyles = {'DQN': '-', 'PPO': '--', 'Random': ':'}
+    
+    # Plot portfolio values / cumulative rewards
+    for agent_name, episode_data in agents_episode_data.items():
+        steps = episode_data.get('steps', [])[:min_steps]
+        if not steps:
+            continue
+        
+        indices = [s['step'] for s in steps]
+        portfolio_values = [s.get('portfolio_value') for s in steps]
+        cumulative_rewards = [s.get('cumulative_reward') for s in steps]
+        color = colors.get(agent_name, 'gray')
+        linestyle = linestyles.get(agent_name, '-')
+        
+        if any(v is not None for v in portfolio_values):
+            axes[0].plot(indices, [v if v is not None else np.nan for v in portfolio_values],
+                        label=agent_name, color=color, linestyle=linestyle, alpha=0.8, linewidth=2)
+        else:
+            axes[0].plot(indices, cumulative_rewards, 
+                        label=agent_name, color=color, linestyle=linestyle, alpha=0.8, linewidth=2)
+    
+    axes[0].set(ylabel='Value / Reward', title='Comparative Portfolio Value / Cumulative Reward')
+    axes[0].legend(loc='best')
+    axes[0].grid(True, alpha=0.3)
+    
+    # Plot step rewards
+    for agent_name, episode_data in agents_episode_data.items():
+        steps = episode_data.get('steps', [])[:min_steps]
+        if not steps:
+            continue
+        
+        indices = [s['step'] for s in steps]
+        rewards = [s.get('reward', 0.0) for s in steps]
+        color = colors.get(agent_name, 'gray')
+        
+        axes[1].plot(indices, rewards, label=agent_name, color=color, alpha=0.6, linewidth=1)
+    
+    axes[1].set(xlabel='Step', ylabel='Reward', title='Comparative Step Rewards')
+    axes[1].legend(loc='best')
+    axes[1].grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    else:
+        plt.show()
+    plt.close()
+
+
+def plot_comparative_trading_timeline(agents_episode_data, save_path=None):
+    """
+    Plot comparative trading actions timeline for multiple agents.
+    
+    Args:
+        agents_episode_data: Dictionary mapping agent names to episode data dictionaries
+        save_path: Path to save the plot (None to display)
+    """
+    if not agents_episode_data:
+        raise ValueError("No episode data provided for comparison.")
+    
+    # Get common step indices
+    min_steps = min(len(ep_data.get('steps', [])) for ep_data in agents_episode_data.values())
+    
+    fig, ax = plt.subplots(figsize=(15, 6))
+    
+    colors = {'DQN': 'blue', 'PPO': 'green', 'Random': 'red'}
+    markers = {'DQN': 'o', 'PPO': 's', 'Random': '^'}
+    
+    for agent_name, episode_data in agents_episode_data.items():
+        steps = episode_data.get('steps', [])[:min_steps]
+        if not steps:
+            continue
+        
+        indices = [s['step'] for s in steps]
+        actions = [s.get('action', s.get('position', 0)) for s in steps]
+        color = colors.get(agent_name, 'gray')
+        marker = markers.get(agent_name, 'o')
+        
+        ax.scatter(indices, actions, c=color, marker=marker, s=30, 
+                  label=agent_name, alpha=0.6)
+        ax.plot(indices, actions, color=color, alpha=0.3, linewidth=1)
+    
+    ax.set(xlabel='Step', ylabel='Action/Position', title='Comparative Trading Actions Timeline')
+    ax.legend(loc='best')
+    ax.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    else:
+        plt.show()
+    plt.close()
+

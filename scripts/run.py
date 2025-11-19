@@ -13,8 +13,8 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import torch
-from scripts.train import train_agent, load_config, resolve_project_path
-from scripts.evaluate import evaluate_dqn_agent
+from scripts.train import train_agent, train_all_agents, load_config, resolve_project_path
+from scripts.evaluate import evaluate_agent_model, evaluate_all_agents, evaluate_dqn_agent
 
 
 def list_available_configs():
@@ -110,8 +110,8 @@ def interactive_mode():
     return config_path, data_path, mode, device
 
 
-def run_training(config_path, data_path=None, device=None):
-    """Launch training."""
+def run_training(config_path, data_path=None, device=None, all_agents=True):
+    """Launch training for all agents."""
     print("\n" + "="*60)
     print("STARTING TRAINING")
     print("="*60)
@@ -130,23 +130,31 @@ def run_training(config_path, data_path=None, device=None):
         print(f"Using data: {data_path_resolved}")
     
     try:
-        agent, env, run_dir = train_agent(config, device=device)
-        print(f"\n✓ Training completed successfully!")
-        print(f"  Run directory: {run_dir}")
-        return agent, env, run_dir
+        if all_agents:
+            results, run_dir = train_all_agents(config, device=device)
+            print(f"\n✓ Training completed successfully!")
+            print(f"  Run directory: {run_dir}")
+            return results, run_dir
+        else:
+            agent, env, run_dir = train_agent(config, device=device)
+            print(f"\n✓ Training completed successfully!")
+            print(f"  Run directory: {run_dir}")
+            return agent, env, run_dir
     except Exception as e:
         print(f"\n✗ Error during training: {e}")
         import traceback
         traceback.print_exc()
-        return None, None, None
+        return None, None
 
 
-def run_evaluation(config_path, model_path=None, data_path=None, device=None):
-    """Launch evaluation."""
+def run_evaluation(config_path, run_dir=None, model_path=None, data_path=None, device=None):
+    """Launch evaluation for all agents."""
     print("\n" + "="*60)
     print("STARTING EVALUATION")
     print("="*60)
     print(f"Configuration: {config_path}")
+    if run_dir:
+        print(f"Run directory: {run_dir}")
     if model_path:
         print(f"Model: {model_path}")
     if data_path:
@@ -161,32 +169,41 @@ def run_evaluation(config_path, model_path=None, data_path=None, device=None):
         config['data']['raw_data_path'] = str(data_path_resolved)
         config['data']['processed_data_path'] = str(data_path_resolved)
     
-    # Find model if not specified
-    if not model_path:
-        # Search for best model in recent runs
+    # Find run directory if not specified
+    if not run_dir:
+        # Search for most recent run directory
         logs_dir = PROJECT_ROOT / "logs" / "runs"
         if logs_dir.exists():
             runs = sorted(logs_dir.glob("run_*"), reverse=True)
-            for run_dir in runs:
-                best_model = run_dir / "checkpoints" / "best_model.pt"
-                if best_model.exists():
-                    model_path = best_model
-                    print(f"Model found: {model_path}")
-                    break
-        
-        if not model_path:
-            model_path = PROJECT_ROOT / "logs" / "checkpoints" / "best_model.pt"
-            if not model_path.exists():
-                model_path = input("No model found. Enter path to model: ").strip()
+            if runs:
+                run_dir = runs[0]
+                print(f"Using most recent run directory: {run_dir}")
     
-    try:
-        results = evaluate_dqn_agent(config, str(model_path), device=device, compare_baselines=True)
-        print(f"\n✓ Evaluation completed successfully!")
-        return results
-    except Exception as e:
-        print(f"\n✗ Error during evaluation: {e}")
-        import traceback
-        traceback.print_exc()
+    # If we have a run_dir, evaluate all agents
+    if run_dir:
+        run_dir = resolve_project_path(run_dir)
+        try:
+            results = evaluate_all_agents(config, str(run_dir), device=device, compare_baselines=True)
+            print(f"\n✓ Evaluation completed successfully!")
+            return results
+        except Exception as e:
+            print(f"\n✗ Error during evaluation: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    elif model_path:
+        # Fallback to single agent evaluation
+        try:
+            results = evaluate_agent_model(config, str(model_path), device=device, compare_baselines=True)
+            print(f"\n✓ Evaluation completed successfully!")
+            return results
+        except Exception as e:
+            print(f"\n✗ Error during evaluation: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    else:
+        print("✗ No run directory or model path provided")
         return None
 
 
@@ -211,11 +228,12 @@ Usage examples:
         """
     )
     
-    parser.add_argument('--train', action='store_true', help='Launch training')
-    parser.add_argument('--evaluate', action='store_true', help='Launch evaluation')
+    parser.add_argument('--train', action='store_true', help='Launch training (trains all agents by default)')
+    parser.add_argument('--evaluate', action='store_true', help='Launch evaluation (evaluates all agents by default)')
     parser.add_argument('--config', type=str, help='Path to configuration file')
     parser.add_argument('--data', type=str, help='Path to data (optional)')
-    parser.add_argument('--model', type=str, help='Path to model (for evaluation)')
+    parser.add_argument('--model', type=str, help='Path to model (for single agent evaluation)')
+    parser.add_argument('--run-dir', type=str, help='Run directory (for multi-agent evaluation)')
     parser.add_argument('--device', type=str, choices=['cuda', 'cpu'], help='Device to use')
     parser.add_argument('--interactive', '-i', action='store_true', help='Interactive mode')
     
@@ -226,25 +244,26 @@ Usage examples:
         config_path, data_path, mode, device = interactive_mode()
         
         if mode == '1' or mode.lower() == 'train':
-            run_training(config_path, data_path, device)
+            results, run_dir = run_training(config_path, data_path, device, all_agents=True)
+            if results is not None and run_dir is not None:
+                print(f"\n✓ All agents trained successfully!")
         elif mode == '2' or mode.lower() == 'evaluate':
-            run_evaluation(config_path, None, data_path, device)
+            run_evaluation(config_path, run_dir=None, data_path=data_path, device=device)
         elif mode == '3' or mode.lower() == 'both':
-            agent, env, run_dir = run_training(config_path, data_path, device)
-            if agent is not None and run_dir is not None:
-                # Find model in the run
-                model_path = run_dir / "checkpoints" / "best_model.pt"
-                if model_path.exists():
-                    run_evaluation(config_path, str(model_path), data_path, device)
+            results, run_dir = run_training(config_path, data_path, device, all_agents=True)
+            if results is not None and run_dir is not None:
+                # Evaluate all agents in the run
+                run_evaluation(config_path, run_dir=str(run_dir), data_path=data_path, device=device)
     else:
         # Command line mode
         device = torch.device(args.device) if args.device else None
         
         if args.train:
-            run_training(args.config or 'configs/hyperparameters_v1.yaml', args.data, device)
+            run_training(args.config or 'configs/hyperparameters_v1.yaml', args.data, device, all_agents=True)
         
         if args.evaluate:
-            run_evaluation(args.config or 'configs/hyperparameters_v1.yaml', args.model, args.data, device)
+            run_evaluation(args.config or 'configs/hyperparameters_v1.yaml', 
+                          run_dir=args.run_dir, model_path=args.model, data_path=args.data, device=device)
 
 
 if __name__ == '__main__':
