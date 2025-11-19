@@ -9,6 +9,7 @@ agent:
     min_lr: 0.00001  # (ReduceLROnPlateau) Lower bound on the learning rate
     step_size: 10  # (StepLR) Period of learning rate decay
     gamma: 0.9  # (StepLR/ExponentialLR) Multiplicative factor of learning rate decay
+
   gamma: 0.99  # Discount factor
   epsilon_start: 1.0  # Initial epsilon for epsilon-greedy
   epsilon_end: 0.01  # Final epsilon value
@@ -45,8 +46,7 @@ data:
   eval_start: '2025-10-01'
   eval_end: '2025-11-01'
   data_folder: 'data'
-  raw_data_path: 'data/raw/binance-BTCUSDT-1h.pkl'
-  processed_data_path: 'data/processed/data_v1.csv'
+  processed_data_path: 'data/processed/data_v2.csv'
   download_if_missing: true
 
 # Logging Configuration
