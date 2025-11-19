@@ -167,4 +167,3 @@ class RandomAgent:
         Random agent has no state to reset.
         """
         pass
-
