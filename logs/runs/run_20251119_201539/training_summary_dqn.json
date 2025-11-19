@@ -1,0 +1,33 @@
+{
+  "run_id": "run_20251119_201539",
+  "timestamp": "20251119_201539",
+  "start_time": "20251119_201539",
+  "num_episodes": 500,
+  "device": "cpu",
+  "final_metrics": {
+    "final_reward": 0.5780695806807273,
+    "final_portfolio_return": 0.7826000000000001,
+    "final_market_return": 0.7951,
+    "final_excess_return": -0.012499999999999956
+  },
+  "best_metrics": {
+    "best_reward": 2.959154993343715,
+    "best_episode": 464,
+    "best_portfolio_return": 18.2817,
+    "best_excess_return": 17.4866
+  },
+  "average_metrics": {
+    "avg_reward": -0.6707716445153766,
+    "avg_portfolio_return": 0.046817800000000034,
+    "avg_market_return": 0.7950999999999998,
+    "avg_excess_return": -0.7482822,
+    "avg_loss": 0.0001053868215539833
+  },
+  "files": {
+    "config": "logs/runs/run_20251119_201539/config.yaml",
+    "final_model": "logs/runs/run_20251119_201539/checkpoints/dqn/final_model.pt",
+    "best_model": "logs/runs/run_20251119_201539/checkpoints/dqn/best_model.pt",
+    "training_log": "logs/runs/run_20251119_201539/training_log_dqn.csv",
+    "tensorboard_dir": "logs/runs/run_20251119_201539/tensorboard/dqn"
+  }
+}

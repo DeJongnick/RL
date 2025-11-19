@@ -12,7 +12,7 @@ network:
   hidden_dim: 128
 
 training:
-  num_episodes: 100
+  num_episodes: 500
   max_steps_per_episode: 8760
   min_buffer_size: 1000
   eval_frequency: 50
@@ -20,7 +20,7 @@ training:
   log_frequency: 10
 
 environment:
-  positions: [-1, 0, 0.5, 1, 2]
+  positions: [-3, -2, -1, 0, 0.5, 1, 2, 3]
   trading_fees: 0.0001
   borrow_interest_rate: 0.000003
 
