@@ -127,8 +127,7 @@ RL/
 ├── src/
 │   ├── agents/          # Agent implementations
 │   │   ├── dqn_agent.py
-│   │   ├── random_agent.py
-│   │   └── buy_hold_agent.py
+│   │   └── random_agent.py
 │   ├── models/          # Network architectures
 │   │   └── dqn_network.py
 │   └── utils/           # Utilities
@@ -144,7 +143,6 @@ RL/
 
 - **DQNAgent**: Deep Q-Learning agent with Dueling DQN architecture
 - **RandomAgent**: Baseline agent that selects random positions
-- **BuyHoldAgent**: Baseline agent that maintains a long position
 
 ## 📊 Configuration
 

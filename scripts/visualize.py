@@ -133,13 +133,11 @@ def generate_evaluation_plots(config, save_dir='eval', run_dir=None):
     if run_dir:
         baseline_csvs = {
             'Random': csv_dir / 'random_results.csv',
-            'BuyHold': csv_dir / 'buyhold_results.csv',
             'DQN': csv_dir / 'dqn_results.csv'
         }
     else:
         baseline_csvs = {
             'Random': EVAL_ROOT / 'csv' / 'random_results.csv',
-            'BuyHold': EVAL_ROOT / 'csv' / 'buyhold_results.csv',
             'DQN': eval_csv
         }
     results = {k: pd.read_csv(p) for k, p in baseline_csvs.items() if p.exists()}

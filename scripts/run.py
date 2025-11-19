@@ -32,13 +32,7 @@ def list_available_data():
     data_dir = PROJECT_ROOT / "data"
     data_files = []
     
-    # Raw data
-    raw_dir = data_dir / "raw"
-    if raw_dir.exists():
-        for data_file in sorted(raw_dir.glob("*.pkl")):
-            data_files.append(f"raw/{data_file.name}")
-    
-    # Processed data
+    # Only list processed data files
     processed_dir = data_dir / "processed"
     if processed_dir.exists():
         for data_file in sorted(processed_dir.glob("*.csv")):
@@ -57,47 +51,49 @@ def interactive_mode():
     configs = list_available_configs()
     if not configs:
         print("No configuration found in configs/")
-        config_path = input("Enter path to configuration file: ").strip()
-    else:
-        print("Available configurations:")
-        for i, config in enumerate(configs, 1):
-            print(f"  {i}. {config}")
-        print(f"  {len(configs) + 1}. Custom path")
-        
-        choice = input(f"\nChoose a configuration (1-{len(configs) + 1}): ").strip()
-        try:
-            idx = int(choice) - 1
-            if 0 <= idx < len(configs):
-                config_path = f"configs/{configs[idx]}"
-            else:
-                config_path = input("Enter path to configuration file: ").strip()
-        except ValueError:
-            config_path = input("Enter path to configuration file: ").strip()
+        raise ValueError("No configuration files available. Please add a YAML file in configs/")
+    
+    print("Available configurations:")
+    for i, config in enumerate(configs, 1):
+        print(f"  {i}. {config}")
+    
+    choice = input(f"\nChoose a configuration (1-{len(configs)}): ").strip()
+    try:
+        idx = int(choice) - 1
+        if 0 <= idx < len(configs):
+            config_path = f"configs/{configs[idx]}"
+        else:
+            raise ValueError(f"Invalid choice. Please select a number between 1 and {len(configs)}")
+    except ValueError as e:
+        if "Invalid choice" in str(e):
+            raise
+        raise ValueError(f"Invalid input. Please select a number between 1 and {len(configs)}")
     
     # Data choice (optional - can use data from config)
     print("\n" + "-"*60)
     data_files = list_available_data()
-    if data_files:
+    if not data_files:
+        print("No data files found in data/")
+        data_path = None  # Use data from config
+    else:
         print("Available data files:")
-        print("  0. Use data from configuration (default)")
         for i, data_file in enumerate(data_files, 1):
             print(f"  {i}. {data_file}")
-        print(f"  {len(data_files) + 1}. Custom path")
         
-        choice = input(f"\nChoose data (0-{len(data_files) + 1}): ").strip()
-        try:
-            idx = int(choice)
-            if idx == 0:
-                data_path = None  # Use data from config
-            elif 1 <= idx <= len(data_files):
-                data_path = f"data/{data_files[idx - 1]}"
-            else:
-                data_path = input("Enter path to data: ").strip()
-        except ValueError:
-            data_path = None
-    else:
-        print("No data files found in data/")
-        data_path = input("Enter path to data (or leave empty to use config): ").strip() or None
+        choice = input(f"\nChoose data (1-{len(data_files)}, or press Enter to use config default): ").strip()
+        if not choice:
+            data_path = None  # Use data from config
+        else:
+            try:
+                idx = int(choice)
+                if 1 <= idx <= len(data_files):
+                    data_path = f"data/{data_files[idx - 1]}"
+                else:
+                    raise ValueError(f"Invalid choice. Please select a number between 1 and {len(data_files)}")
+            except ValueError as e:
+                if "Invalid choice" in str(e):
+                    raise
+                raise ValueError(f"Invalid input. Please select a number between 1 and {len(data_files)}")
     
     # Mode choice
     print("\n" + "-"*60)
@@ -108,10 +104,8 @@ def interactive_mode():
     
     mode = input("\nChoose mode (1-3): ").strip()
     
-    # Device choice
-    print("\n" + "-"*60)
-    device_choice = input("Device (cuda/cpu, leave empty for auto): ").strip().lower()
-    device = torch.device(device_choice) if device_choice in ['cuda', 'cpu'] else None
+    # Device is automatically selected
+    device = None  # Auto-detect (cuda if available, else cpu)
     
     return config_path, data_path, mode, device
 

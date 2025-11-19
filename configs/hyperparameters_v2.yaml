@@ -1,64 +1,38 @@
 agent:
-  state_dim: 7  # 5 market features + 2 position features
-  lr: 0.0001  # Default (initial) learning rate (used if adaptive_lr is false)
-  adaptive_lr: true  # Enable/disable adaptive learning rate (true for adaptive, false for fixed)
-  lr_scheduler:
-    type: ReduceLROnPlateau  # Supported: ReduceLROnPlateau, StepLR, ExponentialLR, OneCycleLR
-    patience: 5  # (ReduceLROnPlateau) Number of epochs with no improvement after which LR will be reduced
-    factor: 0.5  # (ReduceLROnPlateau) Factor by which the learning rate will be reduced
-    min_lr: 0.00001  # (ReduceLROnPlateau) Lower bound on the learning rate
-    step_size: 10  # (StepLR) Period of learning rate decay
-    gamma: 0.9  # (StepLR/ExponentialLR) Multiplicative factor of learning rate decay
+  lr: 0.0001
+  gamma: 0.99
+  epsilon_start: 1.0
+  epsilon_end: 0.01
+  epsilon_decay: 0.995
+  buffer_size: 100000
+  batch_size: 64
+  target_update_freq: 100
 
-  gamma: 0.99  # Discount factor
-  epsilon_start: 1.0  # Initial epsilon for epsilon-greedy
-  epsilon_end: 0.01  # Final epsilon value
-  epsilon_decay: 0.995  # Epsilon decay factor per episode
-  buffer_size: 100000  # Experience replay buffer size
-  batch_size: 64  # Batch size for training
-  target_update_freq: 100  # Target network update frequency (steps)
-
-# Network Architecture
 network:
-  hidden_dim: 128  # Hidden layer dimension
-  value_hidden_dim: 64  # Value stream hidden dimension
-  advantage_hidden_dim: 64  # Advantage stream hidden dimension
+  hidden_dim: 128
 
-# Training Configuration
 training:
-  num_episodes: 10  # Number of training episodes
-  max_steps_per_episode: 8760  # Maximum steps per episode (full dataset)
-  min_buffer_size: 1000  # Minimum buffer size before training starts
-  eval_frequency: 50  # Evaluate every N episodes
-  save_frequency: 100  # Save checkpoint every N episodes
-  log_frequency: 10  # Log metrics every N episodes
+  num_episodes: 10
+  max_steps_per_episode: 8760
+  min_buffer_size: 1000
+  eval_frequency: 50
+  save_frequency: 100
+  log_frequency: 10
 
-# Environment Configuration
 environment:
-  positions: [-1, 0, 0.5, 1, 2]  
-  trading_fees: 0.0001  # 0.01% per transaction
-  borrow_interest_rate: 0.000003  # 0.0003% per timestep
+  positions: [-1, 0, 0.5, 1, 2]
+  trading_fees: 0.0001
+  borrow_interest_rate: 0.000003
 
-# Data Configuration
 data:
-  train_start: '2024-10-01'
-  train_end: '2025-09-30'
-  eval_start: '2025-10-01'
-  eval_end: '2025-11-01'
   data_folder: 'data'
   processed_data_path: 'data/processed/data_v2.csv'
   download_if_missing: true
 
-# Logging Configuration
 logging:
   log_dir: 'logs'
-  tensorboard_dir: 'logs/tensorboard'
-  checkpoint_dir: 'logs/checkpoints'
-  csv_log_file: 'logs/training_log.csv'
 
-# Evaluation Configuration
 evaluation:
   num_episodes: 10
   render: false
   render_logs_dir: 'eval/render_logs'
-  results_csv: 'eval/evaluation_results.csv'

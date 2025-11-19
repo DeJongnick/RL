@@ -26,7 +26,7 @@ environment:
 
 data:
   data_folder: 'data'
-  processed_data_path: 'data/processed/data_v1.csv'
+  processed_data_path: 'data/processed/data_v3.csv'
   download_if_missing: true
 
 logging:

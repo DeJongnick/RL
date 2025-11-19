@@ -19,7 +19,6 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.agents.dqn_agent import DQNAgent
 from src.agents.random_agent import RandomAgent
-from src.agents.buy_hold_agent import BuyHoldAgent
 from src.utils.data_loader import load_and_preprocess_data
 from src.utils.environment_setup import create_eval_env
 from src.utils.evaluation import evaluate_agent
@@ -173,14 +172,6 @@ def evaluate_dqn_agent(config, model_path, device=None, compare_baselines=True, 
                                   render=False, csv_path=str(random_csv))
         results_all["Random"] = res_rand
         print(f"Random Portfolio Return: {res_rand['portfolio_return'].mean():.2%}")
-
-        # Buy & Hold Agent
-        buyhold_agent = BuyHoldAgent(positions=env_conf['positions'])
-        buyhold_csv = csv_dir / "buyhold_results.csv"
-        res_bh = evaluate_agent(buyhold_agent, env, eval_conf['num_episodes'], 
-                               render=False, csv_path=str(buyhold_csv))
-        results_all["BuyHold"] = res_bh
-        print(f"BuyHold Portfolio Return: {res_bh['portfolio_return'].mean():.2%}")
 
         # Visual comparison
         cmp_png = png_dir / "baseline_comparison.png"
