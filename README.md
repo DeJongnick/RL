@@ -524,14 +524,6 @@ See `requirements.txt` for the complete list.
 - **State Representation**: Add more technical indicators or use raw OHLCV with CNNs
 - **Action Space**: Continuous actions for precise position sizing
 - **Multi-Task Learning**: Learn to trade multiple timeframes simultaneously
-
-## 📚 References
-
-- **DQN**: Mnih et al., "Human-level control through deep reinforcement learning" (Nature, 2015)
-- **Dueling DQN**: Wang et al., "Dueling Network Architectures for Deep Reinforcement Learning" (ICML, 2016)
-- **Double DQN**: van Hasselt et al., "Deep Reinforcement Learning with Double Q-learning" (AAAI, 2016)
-- **PPO**: Schulman et al., "Proximal Policy Optimization Algorithms" (arXiv, 2017)
-
 ---
 
 For questions or contributions, please refer to the code documentation or open an issue.
